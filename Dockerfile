@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install psycopg (binary version is easiest)
-RUN pip install --no-cache-dir psycopg[binary]
+RUN pip install --no-cache-dir -r requirement.txt
 
 # Copy test script into container
 COPY db.py .
