@@ -14,11 +14,13 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
+COPY requirements.txt .
+
 # Install psycopg (binary version is easiest)
-RUN pip install --no-cache-dir -r requirement.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy test script into container
-COPY db.py .
+COPY . .
 
 # Default command
-CMD ["python", "db.py"]
+CMD ["python", "main.py"]

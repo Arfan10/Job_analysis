@@ -6,3 +6,6 @@ print(data[:2])
 
 conn = connect_db()
 print("Database connected")
+
+while True:
+    pass

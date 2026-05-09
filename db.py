@@ -1,22 +1,15 @@
+import os
 import psycopg
 
-con = psycopg.connect(
-    host="host.docker.internal",
-    dbname="postgres",  
-    user="postgres",
-    password="Arfanshaikh@10",
-    port=5432
-)
+def connect_db():
+    conn = psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
+    )
+    return conn
 
-
-# Cursor
-
-cur = con.cursor()
-
-cur.execute("SELECT version();")
-
-rows = cur.fetchall()
-
-
-
-con.close()
+conn = connect_db()
+print("Database connected successfully")

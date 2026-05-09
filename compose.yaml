@@ -1,18 +1,22 @@
 services:
   python-app:
     build: .
+    container_name: python-container
     ports:
       - "8000:8000"
     environment:
-      - DB_HOST=localhost
+      - DB_HOST=postgres-db
       - DB_PORT=5432
       - DB_NAME=JobAnalysis
       - DB_USER=postgres
       - DB_PASSWORD=Arfanshaikh@10
     depends_on:
       - postgres-db
+    volumes:
+      - .:/app
+
   postgres-db:
-    image: postgres:latest
+    image: postgres:18
     environment:
       - POSTGRES_DB=JobAnalysis
       - POSTGRES_USER=postgres
@@ -20,6 +24,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql
+
 volumes:
   postgres_data:
