@@ -1,2 +1,5 @@
 psycopg[binary]
 requests
+tenacity
+python-dotenv
+dbt-postgres
