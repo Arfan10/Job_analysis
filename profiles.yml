@@ -1,11 +1,12 @@
 job_analysis:
-  target: dev
   outputs:
     dev:
-      type: postgres
-      host: postgres-db
-      port: 5432
       dbname: Job_Analysis
-      user: postgres
-      password: "{{ env_var('DB_PASSWORD') }}"
+      host: postgres-db
+      pass: Arfanshaikh@10
+      port: 5432
       schema: public
+      threads: 1
+      type: postgres
+      user: postgres
+  target: dev
