@@ -40,9 +40,11 @@ services:
     image: ghcr.io/dbt-labs/dbt-postgres:latest
     container_name: dbt-container
     working_dir: /usr/app
-    entrypoint: ["dbt"]
+    entrypoint: ["tail"]
+    command: ["-f", "/dev/null"]
     volumes:
       - .:/usr/app
+      - ~/.dbt:/root/.dbt
     environment:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
@@ -52,6 +54,9 @@ services:
         condition: service_healthy
     networks:
       - app-network
+    tty: true
+    ports:
+      - "8080:8080"
 
 networks:
   app-network:

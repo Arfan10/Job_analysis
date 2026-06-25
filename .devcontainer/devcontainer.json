@@ -1,0 +1,14 @@
+{
+  "name": "dbt-dev",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "dbt",
+  "workspaceFolder": "/usr/app",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "innoverio.vscode-dbt-power-user"
+      ]
+    }
+  }
+}
