@@ -1,0 +1,13 @@
+analytics:
+  target: dev
+
+  outputs:
+    dev:
+      type: postgres
+      host: postgres-db
+      user: postgres
+      password: Arfanshaikh@10
+      port: 5432
+      dbname: Job_Analysis
+      schema: public
+      threads: 1

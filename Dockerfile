@@ -1,24 +1,20 @@
-# Use official Python base image
-FROM python:3
+FROM python:3.12-slim
 
-# Prevent Python from writing .pyc files & enable stdout flushing
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies required for psycopg
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
 WORKDIR /app
 
-# Install psycopg (binary version is easiest)
-RUN pip install --no-cache-dir psycopg[binary]
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy test script into container
-COPY db.py .
+COPY requirements.txt .
 
-# Default command
-CMD ["python", "db.py"]
+RUN uv pip install --system -r requirements.txt
+RUN pip install --no-cache-dir \
+    dbt-core \
+    dbt-postgres
+RUN apt-get update && apt-get install -y git
+
+COPY . .
+
+CMD ["python", "main.py"]

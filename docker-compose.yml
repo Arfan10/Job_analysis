@@ -1,0 +1,66 @@
+services:
+  python-app:
+    build: .
+    container_name: python-container
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      - postgres-db
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+
+  postgres-db:
+    image: postgres:17
+    container_name: postgres-db
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:latest
+    container_name: dbt-container
+    working_dir: /usr/app
+    entrypoint: ["tail"]
+    command: ["-f", "/dev/null"]
+    volumes:
+      - .:/usr/app
+      - ~/.dbt:/root/.dbt
+    environment:
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - app-network
+    tty: true
+    ports:
+      - "8080:8080"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
