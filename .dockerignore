@@ -6,3 +6,15 @@ venv/
 target/
 dbt_packages/
 .git/
+# Ignore Airflow logs and runtime files
+airflow/logs/
+logs/
+
+# Ignore virtual environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Ignore local database storage if present
+postgres_data/

@@ -191,3 +191,6 @@ Built as the primary portfolio project for a Data Engineering MSc specialisation
 ---
 
 *Built by Ayan | [LinkedIn](https://linkedin.com/in/YOUR_PROFILE) | [GitHub](https://github.com/YOUR_USERNAME)*
+
+
+![Month 1 Pipeline Architecture](job_Analysis.drawio.png)
