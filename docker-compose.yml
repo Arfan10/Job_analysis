@@ -25,7 +25,7 @@ services:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
-      - "5433:5432"
+      - "5433:5432"   # Connect via port 5433 in pgAdmin
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -39,12 +39,12 @@ services:
   dbt:
     image: ghcr.io/dbt-labs/dbt-postgres:latest
     container_name: dbt-container
-    working_dir: /usr/app
+    working_dir: /usr/app/analytics
     entrypoint: ["tail"]
     command: ["-f", "/dev/null"]
     volumes:
       - .:/usr/app
-      - ~/.dbt:/root/.dbt
+      - ./profiles:/root/.dbt
     environment:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
@@ -56,8 +56,74 @@ services:
       - app-network
     tty: true
     ports:
-      - "8080:8080"
+      - "8085:8085"
 
+  # --- Airflow Services ---
+  airflow-init:
+    image: apache/airflow:2.8.0
+    container_name: airflow-init
+    environment:
+      # Pass natively using variables, isolated on internal port 5432
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres-db:5432/${DB_NAME}
+      - _AIRFLOW_DB_UPGRADE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - app-network
+    command: version
+
+  airflow-webserver:
+    image: apache/airflow:2.8.0
+    container_name: airflow-webserver
+    restart: always
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres-db:5432/${DB_NAME}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - PYTHONPATH=/app
+      - _PIP_ADDITIONAL_REQUIREMENTS=psycopg[binary] requests
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+    command: webserver
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.0
+    container_name: airflow-scheduler
+    restart: always
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres-db:5432/${DB_NAME}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - PYTHONPATH=/app
+      - _PIP_ADDITIONAL_REQUIREMENTS=psycopg[binary] requests
+
+    volumes:
+      - .:/app
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+    command: scheduler
+
+# CRITICAL FIX: Explicitly declaring the network layout at root level
 networks:
   app-network:
     driver: bridge

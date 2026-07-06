@@ -5,9 +5,9 @@ analytics:
     dev:
       type: postgres
       host: postgres-db
-      user: postgres
-      password: Arfanshaikh@10
+      user: "{{ env_var('DB_USER') }}"
+      password: "{{ env_var('DB_PASSWORD') }}"
       port: 5432
-      dbname: Job_Analysis
+      dbname: "{{ env_var('DB_NAME') }}"
       schema: public
       threads: 1

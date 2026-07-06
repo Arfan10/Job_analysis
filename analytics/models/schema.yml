@@ -2,8 +2,105 @@ version: 2
 
 models:
   - name: stg_jobs
+    description: "Cleaned, cast, and standardized staging layer for raw job postings ingested from the Adzuna API."
     columns:
-      - name: id
+      - name: job_id
+        description: "The primary key identifier for the job listing, extracted and cast from the source API ID."
         tests:
           - unique
           - not_null
+
+      - name: job_title
+        description: "The explicit title of the job opening (e.g., Data Engineer, Full-Stack Developer)."
+        tests:
+          - not_null
+
+      - name: company_name
+        description: "The display name of the hiring organization or recruiting agency posting the role."
+        tests:
+          - not_null
+
+      - name: job_description
+        description: "The raw text string containing the body, requirements, and responsibilities of the job advertisement."
+
+      - name: primary_location
+        description: "The geographic area or city location parsed from the furthest node of the Adzuna location array."
+
+      - name: salary_min
+        description: "The lower bound of the advertised salary range, cleanly cast to a numeric data type."
+
+      - name: salary_max
+        description: "The upper bound of the advertised salary range, cleanly cast to a numeric data type."
+
+      - name: created_at
+        description: "The UTC timestamp indicating exactly when the job vacancy was originally published to the web."
+
+  - name: fct_jobs
+    description: "Core dimensional fact table for downstream analytics. Contains enriched attributes including text-parsed remote working flags and algorithmic experience salary bands."
+    columns:
+      - name: job_id
+        description: "The unique identifier for the job listing, carrying downstream from the staging layer."
+        tests:
+          - unique
+          - not_null
+
+      - name: job_title
+        description: "The clean title of the job opening."
+        tests:
+          - not_null
+
+      - name: company_name
+        description: "The standardized name of the hiring organization."
+        tests:
+          - not_null
+
+      - name: job_description
+        description: "The text description details outlining requirements and job scope."
+
+      - name: primary_location
+        description: "The primary geographic location or region designated by the company."
+
+      - name: is_remote
+        description: "A boolean flag indicating if the role is home-based. Calculated via string matching wildcards on location and title fields."
+
+      - name: salary_min
+        description: "The lower baseline bound for annual compensation."
+
+      - name: salary_max
+        description: "The upper ceiling bound for annual compensation."
+
+      - name: salary_band
+        description: "A derived categorization bucket classifying positions into 'Junior', 'Mid', 'Senior', 'Not Disclosed', or 'Unclassified' based on the computed average salary."
+        tests:
+          - accepted_values:
+              values: ['Junior', 'Mid', 'Senior', 'Not Disclosed', 'Unclassified']
+
+      - name: created_at
+        description: "The source timestamp reflecting when the listing was posted."
+
+      - name: ingestion_date
+        description: "The processing clock timestamp marking exactly when the data platform transformed and loaded this record into the mart layer."
+
+      - name: dim_companies
+        description: "Dimension table containing deduplicated company profiles with generated hash keys."
+        columns:
+          - name: company_key
+            description: "The primary key of the company dimension, generated via an MD5 hash of the company name."
+            tests:
+              - unique
+              - not_null
+          - name: company_name
+            tests:
+              - not_null
+
+      - name: dim_locations
+        description: "Dimension table containing deduplicated clean geographic locations with generated hash keys."
+        columns:
+          - name: location_key
+            description: "The primary key of the location dimension, generated via an MD5 hash of the location string."
+            tests:
+              - unique
+              - not_null
+          - name: primary_location
+            tests:
+              - not_null
