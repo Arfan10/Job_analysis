@@ -1,2 +1,2 @@
-2026-07-06 13:25:58,774 - INFO - Reading the config from /root/airflow/airflow.cfg
-2026-07-06 13:25:59,667 - INFO - Configured default timezone UTC
+2026-07-06 15:35:55,347 - INFO - Reading the config from /root/airflow/airflow.cfg
+2026-07-06 15:35:56,280 - INFO - Configured default timezone UTC
