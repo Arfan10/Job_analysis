@@ -1,4 +1,8 @@
 
-target/
+analytics/target/
 dbt_packages/
 logs/
+airflow/logs/
+dbt_modules/
+data/raw/
+*.json

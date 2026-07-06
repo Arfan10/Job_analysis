@@ -1,6 +1,6 @@
 import json, os, datetime as dt
-from api_data import get_data
-from loader import connect_db, load_json_to_db
+from pipeline.api_data import get_data
+from pipeline.loader import connect_db, load_json_to_db
 
 data = get_data()
 conn = connect_db()

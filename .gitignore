@@ -1,2 +1,18 @@
 .env
 .venv/
+Dockerfile
+# Python cache
+__pycache__/
+*.pyc
+
+# Airflow and dbt logs
+airflow/logs/
+logs/
+*.log
+
+# Raw Data Scrapes
+data/raw/
+*.json
+
+# dbt target & compilation outputs
+analytics/target/

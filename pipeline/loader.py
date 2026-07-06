@@ -3,7 +3,7 @@ import psycopg
 import json
 import datetime as dt
 import logging
-
+from airflow.hooks.base import BaseHook
 # -----------------------------
 # Logging setup
 # -----------------------------
@@ -19,14 +19,20 @@ logger = logging.getLogger(__name__)
 # DB Connection
 # -----------------------------
 def connect_db():
-    conn = psycopg.connect(
-        host=os.environ['DB_HOST'],
-        port=os.environ['DB_PORT'],
-        dbname=os.environ['DB_NAME'],
-        user=os.environ['DB_USER'],
-        password=os.environ['DB_PASSWORD'],
-    )
-    return conn
+    try:
+        conn_profile = BaseHook.get_connection('postgres_default')
+
+        conn = psycopg.connect(
+                    host=conn_profile.host,
+                    port=conn_profile.port or 5432,
+                    user=conn_profile.login,
+                    password=conn_profile.password,
+                    dbname=conn_profile.schema
+                    )
+        return conn
+    except Exception as e:
+        print(f"Database connection initialization failed: {e}")
+    raise
 
 
 # -----------------------------
