@@ -22,17 +22,27 @@ def connect_db():
     try:
         conn_profile = BaseHook.get_connection('postgres_default')
 
-        conn = psycopg.connect(
+        return psycopg.connect(
                     host=conn_profile.host,
                     port=conn_profile.port or 5432,
                     user=conn_profile.login,
                     password=conn_profile.password,
                     dbname=conn_profile.schema
                     )
-        return conn
-    except Exception as e:
-        print(f"Database connection initialization failed: {e}")
-    raise
+    except Exception as airflow_err:
+        print(f"Airflow connection vault unavailable: {airflow_err}")
+        print("Falling back to environment variables for DB connection...")
+    try:
+        return psycopg.connect(
+                    host=os.getenv("DB_HOST"),
+                    port=os.getenv("DB_PORT", 5432),
+                    user=os.getenv("DB_USER"),
+                    password=os.getenv("DB_PASSWORD"),
+                    dbname=os.getenv("DB_NAME")
+                    )
+    except Exception as env_err: 
+        print(f"Database fallback connection failed: {env_err}")
+        raise env_err
 
 
 # -----------------------------

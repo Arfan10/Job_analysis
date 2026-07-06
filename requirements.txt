@@ -56,3 +56,4 @@ requests
 tenacity
 python-dotenv
 dbt-postgres
+apache-airflow==3.2.2
