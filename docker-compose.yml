@@ -2,37 +2,22 @@ services:
   python-app:
     build: .
     container_name: python-container
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
-      - DB_HOST=postgres-db
-      - DB_PORT=5432
+      # Use ${DB_HOST} from .env instead of local hardcoded postgres-db
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
-    depends_on:
-      - postgres-db
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
     volumes:
       - .:/app
-    networks:
-      - app-network
-
-  postgres-db:
-    image: postgres:17
-    container_name: postgres-db
-    environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-    ports:
-      - "5433:5432"   # Connect via port 5433 in pgAdmin
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -h localhost -p 5432"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - app-network
 
@@ -46,12 +31,11 @@ services:
       - .:/usr/app
       - ./profiles:/root/.dbt
     environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
-    depends_on:
-      postgres-db:
-        condition: service_healthy
     networks:
       - app-network
     tty: true
@@ -60,31 +44,36 @@ services:
 
   # --- Airflow Services ---
   airflow-init:
-    image: apache/airflow:2.8.0
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: airflow-init
     environment:
-      # Pass natively using variables, isolated on internal port 5432
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres-db:5432/${DB_NAME}
+      # Connect Airflow metadata backend to AWS RDS
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
       - _AIRFLOW_DB_UPGRADE=true
       - _AIRFLOW_WWW_USER_CREATE=true
       - _AIRFLOW_WWW_USER_USERNAME=admin
       - _AIRFLOW_WWW_USER_PASSWORD=admin
-    depends_on:
-      postgres-db:
-        condition: service_healthy
     networks:
       - app-network
     command: version
 
   airflow-webserver:
-    image: apache/airflow:2.8.0
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: airflow-webserver
     restart: always
     environment:
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres-db:5432/${DB_NAME}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - PYTHONPATH=/app
-      - _PIP_ADDITIONAL_REQUIREMENTS=psycopg[binary] requests
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
     ports:
       - "8080:8080"
     volumes:
@@ -93,6 +82,9 @@ services:
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./analytics:/opt/airflow/analytics
+      - dbt_target:/opt/airflow/analytics/target
+      - ./profiles:/opt/airflow/profiles
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -101,32 +93,62 @@ services:
     command: webserver
 
   airflow-scheduler:
-    image: apache/airflow:2.8.0
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
     container_name: airflow-scheduler
     restart: always
     environment:
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres-db:5432/${DB_NAME}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - PYTHONPATH=/app
-      - _PIP_ADDITIONAL_REQUIREMENTS=psycopg[binary] requests
-
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - .:/app
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./analytics:/opt/airflow/analytics
+      - dbt_target:/opt/airflow/analytics/target
+      - ./profiles:/opt/airflow/profiles
     depends_on:
       airflow-init:
         condition: service_completed_successfully
     networks:
       - app-network
     command: scheduler
+    
+  s3-runner:
+      build: .
+      env_file:
+        - .env
+      environment:
+        - DB_HOST=${DB_HOST}
+        - DB_PORT=${DB_PORT}
+        - DB_USER=${DB_USER}
+        - DB_PASSWORD=${DB_PASSWORD}
+        - DB_NAME=${DB_NAME}
+        - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      networks:
+        - app-network
+      volumes:
+        - .:/app
+      command: python aws/setup_prod_s3.py
 
-# CRITICAL FIX: Explicitly declaring the network layout at root level
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  postgres_data:
+  dbt_target:

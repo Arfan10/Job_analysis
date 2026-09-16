@@ -9,11 +9,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 COPY requirements.txt .
 
-RUN uv pip install --system -r requirements.txt
-RUN pip install --no-cache-dir \
-    dbt-core \
-    dbt-postgres
-RUN apt-get update && apt-get install -y git
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN uv pip install --system --no-cache-dir \
+    -r requirements.txt \
+    psycopg[binary] \
+    requests
 
 COPY . .
 
