@@ -17,11 +17,11 @@ How tight is the UK job market for data roles right now? This pipeline answers t
 |---|---|---|
 | Ingestion | Python · Adzuna API | ✅ Built |
 | Storage (Raw) | PostgreSQL 17 (Docker) | ✅ Built |
-| Transformation | dbt Core | 🟡 In Progress |
-| Orchestration | Apache Airflow | 📋 Planned |
-| Cloud Storage | AWS S3 | 📋 Planned |
-| Cloud DB | AWS RDS (PostgreSQL) | 📋 Planned |
-| Compute | AWS EC2 | 📋 Planned |
+| Transformation | dbt Core | ✅ Built |
+| Orchestration | Apache Airflow | ✅ Built |
+| Cloud Storage | AWS S3 | ✅ Built |
+| Cloud DB | AWS RDS (PostgreSQL) | ✅ Built |
+| Compute | AWS EC2 | ✅ Built |
 | Batch Processing | PySpark · AWS Glue | 📋 Planned |
 | Streaming | Apache Kafka | 📋 Planned |
 | Data Quality | Great Expectations | 📋 Planned |
