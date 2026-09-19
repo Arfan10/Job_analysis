@@ -2,9 +2,6 @@
 
 A production-grade data engineering pipeline that tracks supply and demand across the UK job market — built to demonstrate end-to-end DE skills for UK fintech roles.
 
-**Live Dashboard:** *(coming Month 4)*  
-**Architecture Diagram:** *(coming Month 1 completion)*  
-**Status:** 🟡 In Progress — Month 1 (Local Pipeline)
 
 ---
 
