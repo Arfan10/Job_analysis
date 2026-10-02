@@ -1,24 +1,37 @@
-import json, os, datetime as dt
-from pipeline.api_data import get_data
-from pipeline.loader import connect_db, load_json_to_db
+import os
+import subprocess
+import sys
 
-data = get_data()
-conn = connect_db()
-print("Database connected")
+def run_dbt():
+    print("=== Starting dbt Transformations ===")
+    
+    # Absolute paths relative to repository root
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    dbt_dir = os.path.join(base_dir, "analytics")
+    profiles_dir = os.path.join(base_dir, "profiles")
 
-# 2. Save JSON
-os.makedirs("data/raw", exist_ok=True)
-filename = f"job_data_{dt.datetime.now().strftime('%Y-%m-%d')}.json"
-path = os.path.join("data/raw", filename)
+    print(f"Executing dbt in: {dbt_dir}")
+    print(f"Using profiles dir: {profiles_dir}")
 
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(data, f, indent=2, ensure_ascii=False)
+    try:
+        # 1. Run dbt models
+        subprocess.run(
+            ["dbt", "run", "--profiles-dir", profiles_dir],
+            cwd=dbt_dir,
+            check=True,
+            text=True
+        )
+        print("=== dbt Run Completed Successfully ===")
 
-print(f"JSON saved to {path}")
+        # 2. Run dbt data tests
+        subprocess.run(
+            ["dbt", "test", "--profiles-dir", profiles_dir],
+            cwd=dbt_dir,
+            check=True,
+            text=True
+        )
+        print("=== dbt Test Completed Successfully ===")
 
-# 3. Load into DB
-load_json_to_db(path)
-
-
-while True:
-    pass
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing dbt: {e}")
+        sys.exit(1)

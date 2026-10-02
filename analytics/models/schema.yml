@@ -73,7 +73,8 @@ models:
         description: "A derived categorization bucket classifying positions into 'Junior', 'Mid', 'Senior', 'Not Disclosed', or 'Unclassified' based on the computed average salary."
         tests:
           - accepted_values:
-              values: ['Junior', 'Mid', 'Senior', 'Not Disclosed', 'Unclassified']
+              arguments:
+                values: ['Junior', 'Mid', 'Senior', 'Not Disclosed', 'Unclassified','Full-time', 'Part-time', 'Contract']
 
       - name: created_at
         description: "The source timestamp reflecting when the listing was posted."

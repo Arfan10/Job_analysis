@@ -100,13 +100,18 @@ def connect_db():
     except Exception as airflow_err:
         print(f"Airflow connection vault unavailable: {airflow_err}")
         print("Falling back to environment variables for DB connection...")
+
+    db_host = os.getenv("DB_HOST")
+    if not db_host:
+        raise ValueError("CRITICAL: DB_HOST environment variable is missing or empty. Cannot establish TCP connection to RDS.")
+
     try:
         return psycopg.connect(
-            host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT", 5432),
-            user=os.getenv("DB_USER"),
+            host=db_host,
+            port=int(os.getenv("DB_PORT", 5432)),
+            user=os.getenv("DB_USER", "postgres"),
             password=os.getenv("DB_PASSWORD"),
-            dbname=os.getenv("DB_NAME")
+            dbname=os.getenv("DB_NAME", "postgres")
         )
     except Exception as env_err:
         print(f"Database fallback connection failed: {env_err}")
@@ -249,3 +254,18 @@ if __name__ == "__main__":
     json_path = sys.argv[1] if len(sys.argv) > 1 else "jobs.json"
     print(f"Executing loader for: {json_path}")
     load_json_to_db(json_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

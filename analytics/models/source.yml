@@ -1,8 +1,8 @@
 version: 2
 
 sources:
-  - name: Job_Analysis       # <--- Must match your first argument in {{ source() }}
-    database: Job_Analysis   # Your physical database name
-    schema: public           # Your target schema
+  - name: Job_Analysis
+    database: postgres 
+    schema: public
     tables:
-      - name: raw_job_data   # <--- Must match your second argument in {{ source() }}
+      - name: raw_job_data

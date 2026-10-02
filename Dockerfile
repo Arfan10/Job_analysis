@@ -1,24 +1,21 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Install system dependencies for psycopg2/dbt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
-
+# Install Python requirements and dbt-postgres
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt dbt-postgres
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN uv pip install --system --no-cache-dir \
-    -r requirements.txt \
-    psycopg[binary] \
-    requests
-
+# Copy full pipeline code and dbt project
 COPY . .
 
-CMD ["python", "main.py"]
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["/bin/sh", "entrypoint.sh"]

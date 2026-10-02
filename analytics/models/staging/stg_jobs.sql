@@ -30,7 +30,7 @@ renamed_and_cast as (
         cast(date_posted as timestamp) as date_posted,
         cast(created_at as timestamp) as created_at,
         cast(last_seen_at as timestamp) as last_seen_at,
-        cast(updated_at as timestamp) as updated_at,
+        cast(last_seen_at as timestamp) as updated_at,
 
         -- Availability tracking (added for is_active support in gold)
         is_active
