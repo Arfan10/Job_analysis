@@ -1,13 +1,14 @@
 # UK Job Market Tightness Index
 
-A production-grade data engineering pipeline that tracks supply and demand across the UK job market — built to demonstrate end-to-end DE skills for UK fintech roles.
+A cloud-deployed data engineering pipeline that tracks supply and demand across the UK job market. It ingests daily job listings from the Adzuna API, transforms them with dbt into analytical models, and surfaces salary, role demand, skills and geographic competition in a Power BI dashboard. It runs automatically every day on AWS.
 
+Built as an end-to-end data engineering portfolio project, targeting Data Engineering roles in UK fintech and financial services.
 
 ---
 
 ## Business Problem
 
-How tight is the UK job market for data roles right now? This pipeline answers that by ingesting daily job listings from the Adzuna API, transforming them into clean analytical models, and surfacing salary trends, role demand, and geographic concentration — updated every day automatically.
+Where is the UK job market tightest, and where is competition lowest? A job seeker applying blindly competes everywhere. This pipeline answers the question with data by measuring advertised demand by city, role and skill, so applications can be aimed at the locations with the best opportunity.
 
 ---
 
@@ -15,89 +16,96 @@ How tight is the UK job market for data roles right now? This pipeline answers t
 
 | Layer | Tool | Status |
 |---|---|---|
-| Ingestion | Python · Adzuna API | ✅ Built |
-| Storage (Raw) | PostgreSQL 17 (Docker) | ✅ Built |
-| Transformation | dbt Core | ✅ Built |
-| Orchestration | Apache Airflow | ✅ Built |
-| Cloud Storage | AWS S3 | ✅ Built |
-| Cloud DB | AWS RDS (PostgreSQL) | ✅ Built |
-| Compute | AWS EC2 | ✅ Built |
-| Batch Processing | PySpark · AWS Glue | 📋 Planned |
-| Streaming | Apache Kafka | 📋 Planned |
-| Data Quality | Great Expectations | 📋 Planned |
-| Visualisation | Power BI | 📋 Planned |
-| Containerisation | Docker · Docker Compose | ✅ Built |
+| Ingestion | Python · Adzuna API (retry with exponential backoff) | ✅ Built |
+| Raw storage | AWS S3 | ✅ Built |
+| Warehouse | AWS RDS (PostgreSQL) | ✅ Built |
+| Transformation | dbt Core (medallion layers) | ✅ Built |
+| Containerisation | Docker · AWS ECR | ✅ Built |
+| Compute | AWS ECS Fargate | ✅ Built |
+| Scheduling | AWS EventBridge (daily) | ✅ Built |
+| Visualisation | Power BI | ✅ Built |
+| Logging | AWS CloudWatch (Python and dbt logs from Fargate runs) | ✅ Built |
+| Failure monitoring | AWS EventBridge | ✅ Built |
+| Sponsor matching | UK Register of Licensed Sponsors | 📋 Planned |
 
 ---
 
 ## Architecture
 
 ```
-Adzuna API
+EventBridge (daily schedule + failure monitoring)
     │
     ▼
-scraper.py ──► raw JSON (local /data/raw/YYYY-MM-DD/)
+ECS Fargate task  (image from ECR; Python and dbt logs streamed to CloudWatch)
     │
-    ▼
-loader.py ──► PostgreSQL (bronze: raw_jobs)          ← ✅ Built
-    │
-    ▼
-dbt Core ──► staging models → fact/dim models        ← 🟡 In Progress
-    │
-    ▼
-Airflow DAG (daily orchestration)                    ← 📋 Planned
-    │
-    ├──► AWS S3 (bronze/silver/gold)                 ← 📋 Planned
-    ├──► AWS RDS (PostgreSQL)                        ← 📋 Planned
-    ├──► PySpark / AWS Glue (batch transforms)       ← 📋 Planned
-    ├──► Kafka (streaming layer)                     ← 📋 Planned
-    └──► Power BI Dashboard                          ← 📋 Planned
+    └── entrypoint.sh  (fails fast on any error)
+          │
+          ├── 1. ingest.py ──► Adzuna API  (3 retries, exponential backoff)
+          │         │
+          │         ├──► raw JSON ──► S3
+          │         └──► loader ──► RDS PostgreSQL  (bronze)
+          │
+          ├── 2. dbt run   ──► silver / gold models  (RDS)
+          └── 3. dbt test  ──► data tests
+                                   │
+                                   ▼
+                          Power BI dashboard  (gold layer)
 ```
+
+![Pipeline Architecture](job_Analysis.drawio.png)
+
+> The architecture diagram above predates the AWS migration. Update it to match the flow shown here.
+
+---
+
+## How a Run Works
+
+One container runs the whole pipeline in sequence. `entrypoint.sh` uses `set -e`, so a failure at any step stops the run and the task exits non-zero.
+
+1. **Ingest**: `ingest.py` pulls the day's listings from Adzuna (about 1,500 records), retrying up to three times with exponential backoff. If zero records come back after retries, the run exits with an error rather than loading nothing.
+2. **Load**: raw JSON is saved and the loader reconciles it against the existing dataset, handling new, updated and removed listings. Rejected records are written to a rejections log.
+3. **Transform**: `dbt run` builds the silver and gold models.
+4. **Test**: `dbt test` validates the models. Tests run after the build, so a failing test fails the task.
 
 ---
 
 ## Project Structure
 
 ```
-uk-job-market-tightness-index/
-├── data/
-│   └── raw/                  # Raw JSON from Adzuna API
-├── pipeline/
-│   ├── scraper.py            # Adzuna API ingestion with retry logic
-│   ├── loader.py             # JSON → PostgreSQL loader (idempotent)
-│   └── db.py                 # PostgreSQL connection helper
-├── dbt_project/
-│   ├── models/
-│   │   ├── staging/          # stg_adzuna__jobs.sql
-│   │   ├── marts/            # fct_jobs.sql, dim_companies.sql, dim_locations.sql
-│   └── dbt_project.yml
-├── dags/                     # Airflow DAGs (planned)
-├── docs/                     # Architecture diagrams, ADRs
-├── docker-compose.yml
+Job_analysis/
+├── analytics/            # dbt project (staging, fact and gold models)
+├── pipeline/             # API client and loader modules
+├── aws/                  # AWS deployment configuration
+├── profiles/             # dbt profiles
+├── data/raw/             # local raw JSON output
+├── airflow/dags/         # legacy local orchestration (superseded, see design decisions)
+├── .devcontainer/
+├── ingest.py             # ingestion entry point
+├── main.py
+├── entrypoint.sh         # container entrypoint: ingest → dbt run → dbt test
 ├── Dockerfile
-├── .env.example
-└── README.md
+├── docker-compose.yml    # local development stack
+├── requirements.txt
+└── pyproject.toml
 ```
 
 ---
 
-## Getting Started
+## Getting Started (local)
 
 ### Prerequisites
 
 - Docker Desktop
-- Python 3.11+
 - Adzuna API credentials ([register here](https://developer.adzuna.com/))
+- A PostgreSQL instance (the local `docker-compose.yml` stack provides one)
 
 ### Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/uk-job-market-tightness-index.git
-cd uk-job-market-tightness-index
+git clone https://github.com/Arfan10/Job_analysis.git
+cd Job_analysis
 
-cp .env.example .env
-# Fill in your Adzuna API key and PostgreSQL credentials in .env
-
+# create a .env file with the variables below
 docker-compose up -d
 ```
 
@@ -107,87 +115,66 @@ docker-compose up -d
 |---|---|
 | `ADZUNA_APP_ID` | Adzuna API application ID |
 | `ADZUNA_API_KEY` | Adzuna API key |
-| `POSTGRES_HOST` | PostgreSQL host (default: `postgres`) |
-| `POSTGRES_PORT` | PostgreSQL port (default: `5432`) |
+| `POSTGRES_HOST` | PostgreSQL host |
+| `POSTGRES_PORT` | PostgreSQL port (default `5432`) |
 | `POSTGRES_DB` | Database name |
 | `POSTGRES_USER` | Database user |
 | `POSTGRES_PASSWORD` | Database password |
 
-### Run the Pipeline
+### Run the pipeline
 
 ```bash
-# Ingest latest job listings from Adzuna
-docker-compose exec app python pipeline/scraper.py
-
-# Load raw JSON into PostgreSQL
-docker-compose exec app python pipeline/loader.py
-
-# Run dbt transformations
-docker-compose exec app dbt build --project-dir dbt_project
+# Build and run the full pipeline (ingest → dbt run → dbt test)
+docker build -t job-analysis .
+docker run --env-file .env job-analysis
 ```
 
----
-
-## Data Models
-
-### Bronze Layer — `raw_jobs`
-Raw job listings as ingested from Adzuna. No transformation applied.
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | SERIAL | Internal primary key |
-| `source_id` | VARCHAR | Adzuna job ID (unique) |
-| `title` | TEXT | Job title |
-| `company` | TEXT | Company name |
-| `location` | TEXT | Job location |
-| `salary_min` | INTEGER | Minimum advertised salary |
-| `salary_max` | INTEGER | Maximum advertised salary |
-| `category` | TEXT | Job category (e.g. "IT Jobs") |
-| `created_at` | TIMESTAMP | Listing publish date |
-
-### Silver Layer — dbt Models *(🟡 In Progress)*
-
-- **`stg_adzuna__jobs`** — Cleaned and typed staging model. Nulls filtered, columns renamed to standard convention.
-- **`fct_jobs`** — Fact table with derived fields: `salary_band` (Junior/Mid/Senior), `is_remote` flag, `ingestion_date`.
-- **`dim_companies`** — Dimension table of unique companies.
-- **`dim_locations`** — Dimension table of unique locations.
-
-### Gold Layer — Data Marts *(📋 Planned)*
-
-- **`salary_trends`** — Average and median salary by role and city, month-over-month.
-- **`role_demand`** — Weekly job posting volume by category, 4-week rolling average.
-- **`company_activity`** — Top employers by posting volume, month-over-month growth.
+In production the same image runs on ECS Fargate, triggered daily by EventBridge.
 
 ---
 
-## Roadmap
+## Data Models (medallion architecture)
 
-| Month | Focus | Status |
-|---|---|---|
-| Month 1 | Local pipeline — Docker · PostgreSQL · dbt · Airflow | 🟡 In Progress |
-| Month 2 | Cloud deployment — AWS S3 · RDS · EC2 · Glue | 📋 Planned |
-| Month 3 | Scale & quality — PySpark · Kafka · Great Expectations | 📋 Planned |
-| Month 4 | Polish & launch — Power BI · documentation · applications | 📋 Planned |
+**Bronze**: raw listings as ingested from Adzuna, loaded to PostgreSQL with no transformation.
+
+**Silver**: cleaned, typed models built with dbt.
+
+- `stg_jobs`: cleaned and typed listings
+- `stg_job_skills`: skills extracted from job descriptions via keyword matching
+
+**Gold**: analytical models that feed Power BI.
+
+- `fct_jobs`: job fact table
+- `fct_job_skills`: skill demand fact table
 
 ---
 
 ## Key Design Decisions
 
-**Why dbt for transformation?** dbt keeps transformation logic in SQL (the language every data team already uses), compiles to plain SQL that runs directly on PostgreSQL/RDS, and generates automatic lineage documentation. The alternative — writing transformation scripts in Python — would produce the same output but with no built-in testing, no lineage graph, and no standardised project structure. Full ADR in `docs/adr-001-dbt-vs-python-transforms.md` *(coming Week 4)*.
+**Why EventBridge + Fargate instead of Airflow?** The pipeline is a single linear sequence (ingest, load, transform, test) that runs once a day. Airflow was used during local development, but on AWS it would mean running and maintaining a scheduler, webserver and metadata database to trigger one container. EventBridge handles the schedule, Fargate runs the container on demand with nothing idle between runs, and `set -e` in the entrypoint gives sequential execution with fail-fast behaviour. If the project grows into multiple independent pipelines with real dependencies, AWS Step Functions is the next step before reintroducing a full orchestrator.
 
-**Why idempotent loading?** The loader uses `ON CONFLICT DO NOTHING` on `source_id`. This means the pipeline can be re-run safely at any time without producing duplicate rows — critical for a daily orchestrated pipeline where failures and reruns are routine.
+**Why dbt for transformation?** Transformation logic stays in SQL, compiles to plain SQL that runs directly on PostgreSQL, ships with built-in testing, and generates lineage documentation. A Python-script equivalent would produce the same tables with no tests and no lineage.
+
+**Why reconcile instead of insert-only loading?** A plain `ON CONFLICT DO NOTHING` load cannot distinguish new, updated and removed listings, which led to records being wrongly treated as duplicates or missed. The loader now compares incoming data against the existing dataset so each case is handled correctly, and reruns remain safe.
+
+**Why retry inside the ingest step?** Adzuna calls can time out or rate-limit. Retrying with backoff inside the task is cheaper and cleaner than re-triggering the whole Fargate task.
+
+---
+
+## Roadmap
+
+| Phase | Focus | Status |
+|---|---|---|
+| 1 | Local pipeline: Docker · PostgreSQL · dbt | ✅ Done |
+| 2 | AWS migration: S3 · RDS · ECR · ECS Fargate · EventBridge | ✅ Done |
+| 3 | Power BI dashboard on the gold layer | ✅ Done |
+| 4 | CloudWatch logging and EventBridge failure monitoring | ✅ Done |
+| 5 | Sponsor matching against the UK Register of Licensed Sponsors | 📋 Planned |
 
 ---
 
 ## About
 
-Built as the primary portfolio project for a Data Engineering MSc specialisation, targeting Junior/Graduate Data Engineer roles in UK fintech and financial services.
-
-**Stack rationale:** Every tool in this project appears in UK junior DE job descriptions — Python, SQL, dbt, Airflow, Docker, PostgreSQL, AWS, and Power BI. The pipeline is built on real public data (Adzuna job listings API) rather than synthetic datasets, producing genuinely useful output.
-
----
+The primary portfolio project for an MSc in Data Science (Data Engineering focus), built on real public data rather than synthetic datasets.
 
 *Built by Ayan | [LinkedIn](https://linkedin.com/in/arfanshaikh) | [GitHub](https://github.com/Arfan10)*
-
-
-![Month 1 Pipeline Architecture](job_Analysis.drawio.png)
