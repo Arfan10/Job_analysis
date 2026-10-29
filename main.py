@@ -1,37 +1,37 @@
-import os
-import subprocess
+# main.py
 import sys
+import subprocess
+from pipeline.ingest import run_ingestion
+from pipeline.loader import JobDataPipeline
 
-def run_dbt():
-    print("=== Starting dbt Transformations ===")
-    
-    # Absolute paths relative to repository root
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    dbt_dir = os.path.join(base_dir, "analytics")
-    profiles_dir = os.path.join(base_dir, "profiles")
-
-    print(f"Executing dbt in: {dbt_dir}")
-    print(f"Using profiles dir: {profiles_dir}")
-
+def main():
     try:
-        # 1. Run dbt models
-        subprocess.run(
-            ["dbt", "run", "--profiles-dir", profiles_dir],
-            cwd=dbt_dir,
-            check=True,
-            text=True
-        )
-        print("=== dbt Run Completed Successfully ===")
+        print("=== Step 1: Ingesting Data from Adzuna API ===")
+        json_path = run_ingestion()
 
-        # 2. Run dbt data tests
-        subprocess.run(
-            ["dbt", "test", "--profiles-dir", profiles_dir],
-            cwd=dbt_dir,
-            check=True,
-            text=True
-        )
-        print("=== dbt Test Completed Successfully ===")
+        print("=== Step 2: Staging Data & Uploading Raw Payload to S3/RDS ===")
+        pipeline = JobDataPipeline()
+        pipeline.process_and_load(json_path)
 
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing dbt: {e}")
-        sys.exit(1)
+        print("=== Step 3: Executing dbt Models ===")
+        subprocess.run(
+            ["dbt", "run", "--profile", "analytics", "--profiles-dir", "profiles"],
+            cwd="analytics",
+            check=True  # Raises CalledProcessError if dbt returns non-zero exit code
+        )
+
+        print("=== Step 4: Executing dbt Data Quality Tests ===")
+        subprocess.run(
+            ["dbt", "test", "--profile", "analytics", "--profiles-dir", "profiles"],
+            cwd="analytics",
+            check=True
+        )
+
+        print("=== Pipeline Execution Complete ===")
+
+    except Exception as err:
+        print(f"CRITICAL: Pipeline execution halted due to unhandled error: {err}")
+        sys.exit(1)  # Force non-zero exit code to mark ECS Task as FAILED
+
+if __name__ == "__main__":
+    main()
