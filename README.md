@@ -52,7 +52,8 @@ ECS Fargate task  (image from ECR; Python and dbt logs streamed to CloudWatch)
                           Power BI dashboard  (gold layer)
 ```
 
-![Pipeline Architecture](job_Analysis.drawio.png)
+<img width="2400" height="1320" alt="architecture" src="https://github.com/user-attachments/assets/7e3cbc7d-1a73-4d48-9ed4-5839422aa4bf" />
+
 
 > The architecture diagram above predates the AWS migration. Update it to match the flow shown here.
 
